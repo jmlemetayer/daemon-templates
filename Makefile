@@ -1,6 +1,13 @@
 CC	:= gcc
 CFLAGS	:= -Wall -Wextra -Werror
+CFLAGS	+= -Iinclude
 LDFLAGS	:=
+
+ifeq ("$(origin D)","command line")
+CFLAGS	+= -DDEBUG
+endif
+
+CFLAGS	+= -DVERSION=\"$(shell git describe --always --dirty)\"
 
 PHONY := all
 all: daemon
