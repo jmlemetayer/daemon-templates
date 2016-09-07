@@ -1,0 +1,264 @@
+#include <getopt.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "log.h"
+#include "network.h"
+
+#define PING_DELAY		1
+
+static struct {
+	int running;
+} global = {
+	.running = 1,
+};
+
+static void handler(int signal)
+{
+	switch (signal) {
+	case SIGHUP:
+		info("Daemon is alive");
+		break;
+
+	case SIGINT:
+	case SIGQUIT:
+	case SIGTERM:
+		info("Stopping daemon");
+
+		global.running = 0;
+		break;
+	}
+}
+
+static int run_listener(const char *iface, const char *port)
+{
+	struct sockaddr_storage addr;
+	char buffer[5] = { [4] = '\0' };
+	socklen_t len;
+	ssize_t count;
+	int sockfd;
+
+	if ((sockfd = get_listener(iface, port)) < 0) {
+		error("Failed to get listener socket");
+		return -1;
+	}
+
+	while (global.running == 1) {
+		len = sizeof(struct sockaddr_storage);
+
+		if ((count = recv_from(sockfd, buffer, 4,
+		                       (struct sockaddr *)&addr, &len)) < 0) {
+			warning("Failed to receive request");
+			continue;
+
+		} else if (count == 0) {
+			continue;
+
+		} else if (strncmp(buffer, "ping", 4) != 0) {
+			warning("Invalid buffer received: %s", buffer);
+			continue;
+
+		} else {
+			notice("Got  ping");
+		}
+
+		if ((count = send_to(sockfd, "pong", 4,
+		                     (struct sockaddr *)&addr, len)) < 0) {
+			warning("Failed to send response");
+
+		} else if (count == 0) {
+			warning("Nothing sent");
+
+		} else {
+			notice("Sent pong");
+		}
+	}
+
+	close(sockfd);
+	return 0;
+}
+
+static int run_talker(const char *host, const char *port)
+{
+	struct sockaddr_storage addr;
+	char buffer[5] = { [4] = '\0' };
+	socklen_t len;
+	ssize_t count;
+	int sockfd;
+
+	if ((sockfd = get_talker(host, port,
+	                         (struct sockaddr *)&addr, &len)) < 0) {
+		error("Failed to get talker socket");
+		return -1;
+	}
+
+	while (global.running == 1) {
+		sleep(PING_DELAY);
+
+		if (global.running == 0) {
+			break;
+
+		} else if ((count = send_to(sockfd, "ping", 4,
+		                            (struct sockaddr *)&addr, len)) < 0) {
+			warning("Failed to send request");
+			continue;
+
+		} else if (count == 0) {
+			warning("Nothing sent");
+			continue;
+
+		} else {
+			notice("Sent ping");
+		}
+
+		if ((count = recv_from(sockfd, buffer, 4, NULL, NULL)) < 0) {
+			warning("Failed to receive response");
+
+		} else if (count == 0) {
+			continue;
+
+		} else if (strncmp(buffer, "pong", 4) != 0) {
+			warning("Invalid buffer received: %s", buffer);
+
+		} else {
+			notice("Got  pong");
+		}
+
+	}
+
+	close(sockfd);
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int status = EXIT_SUCCESS;
+	int logopt = LOG_PID;
+	int foreground = 0;
+	int iopt;
+	int opt;
+
+	int talker = 0;
+	char *iface = NULL;
+	char *host = NULL;
+	char *port = NULL;
+
+	const struct option lopt[] = {
+		{"version",	no_argument,		NULL,  0 },
+		{"help",	no_argument,		NULL,  0 },
+		{"interface",	required_argument,	NULL, 'i'},
+		{"host",	required_argument,	NULL, 'h'},
+		{"port",	required_argument,	NULL, 'p'},
+		{"foreground",	no_argument,		NULL, 'f'},
+		{NULL,		0,			NULL,  0 },
+	};
+
+	while ((opt = getopt_long(argc, argv, "i:h:p:f", lopt, &iopt)) != EOF) {
+		switch (opt) {
+		case 'i':
+			if (iface == NULL && (iface = strdup(optarg)) == NULL) {
+				ewarning("Failed to allocate iface");
+			}
+
+			break;
+
+		case 'h':
+			if (host == NULL) {
+				if ((host = strdup(optarg)) == NULL) {
+					ewarning("Failed to allocate host");
+
+				} else {
+					talker = 1;
+				}
+			}
+
+			break;
+
+		case 'p':
+			if (port == NULL && (port = strdup(optarg)) == NULL) {
+				ewarning("Failed to allocate port");
+			}
+
+			break;
+
+		case 'f':
+			logopt |= LOG_PERROR;
+			foreground = 1;
+			break;
+
+		case 0:
+			if (iopt == 0) {
+				fprintf(stdout, "daemon %s\n", VERSION);
+				exit(EXIT_SUCCESS);
+			}
+
+		default:
+			fprintf(stderr, "Usage: daemon [OPTIONS]...\n"
+			        "\nListener mode:\n"
+			        " -i, --interface IFACE   Use the specified interface"
+			        " (default is " DEFAULT_IFACE ").\n"
+			        "\nTalker mode:\n"
+			        " -h, --host HOST         Use the specified host.\n"
+			        "\nCommon options:\n"
+			        " -p, --port PORT         Use the specified port"
+			        " (default is " DEFAULT_PORT ").\n"
+			        " -f, --foreground        Do not daemonize.\n"
+			        "     --version           Display version.\n"
+			        "     --help              Display this help screen.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	openlog("daemon", logopt, LOG_DAEMON);
+
+	info("Starting daemon in %s mode", talker ? "talker" : "listener");
+
+	if (foreground == 0 && daemon(0, 0) < 0) {
+		ecritical("Failed to daemonize");
+		exit(EXIT_FAILURE);
+
+	} else if (chdir("/") < 0) {
+		ecritical("Failed to chdir to /");
+		exit(EXIT_FAILURE);
+
+	} else if (signal(SIGHUP, handler) == SIG_ERR) {
+		ecritical("Failed to handle SIGHUP");
+		exit(EXIT_FAILURE);
+
+	} else if (signal(SIGINT, handler) == SIG_ERR) {
+		ecritical("Failed to handle SIGINT");
+		exit(EXIT_FAILURE);
+
+	} else if (signal(SIGQUIT, handler) == SIG_ERR) {
+		ecritical("Failed to handle SIGQUIT");
+		exit(EXIT_FAILURE);
+
+	} else if (signal(SIGTERM, handler) == SIG_ERR) {
+		ecritical("Failed to handle SIGTERM");
+		exit(EXIT_FAILURE);
+	}
+
+	if (talker == 0) {
+		if (run_listener(iface ? iface : DEFAULT_IFACE,
+		                 port ? port : DEFAULT_PORT) < 0) {
+			critical("Failed to run listener");
+			status = EXIT_FAILURE;
+		}
+
+	} else {
+		if (run_talker(host, port ? port : DEFAULT_PORT) < 0) {
+			critical("Failed to run talker");
+			status = EXIT_FAILURE;
+		}
+	}
+
+	closelog();
+
+	free(iface);
+	free(host);
+	free(port);
+
+	exit(status);
+}

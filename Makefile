@@ -12,7 +12,7 @@ CFLAGS	+= -DVERSION=\"$(shell git describe --always --dirty)\"
 PHONY := all
 all: daemon
 
-daemon: main.o
+daemon: daemon.o log.o network.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 %.o: src/%.c
