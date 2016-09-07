@@ -1,7 +1,10 @@
+#include <arpa/inet.h>
 #include <getopt.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "log.h"
@@ -32,10 +35,20 @@ static void handler(int signal)
 	}
 }
 
+enum pp_type {
+	PING = 1,
+	PONG = 2,
+};
+
+struct pp_data {
+	enum pp_type type;
+	uint16_t id;
+};
+
 static int run_listener(const char *iface, const char *port)
 {
 	struct sockaddr_storage addr;
-	char buffer[5] = { [4] = '\0' };
+	struct pp_data data;
 	socklen_t len;
 	ssize_t count;
 	int sockfd;
@@ -46,9 +59,10 @@ static int run_listener(const char *iface, const char *port)
 	}
 
 	while (global.running == 1) {
+		memset(&data, 0, sizeof(struct pp_data));
 		len = sizeof(struct sockaddr_storage);
 
-		if ((count = recv_from(sockfd, buffer, 4,
+		if ((count = recv_from(sockfd, &data, sizeof(struct pp_data),
 		                       (struct sockaddr *)&addr, &len)) < 0) {
 			warning("Failed to receive request");
 			continue;
@@ -56,15 +70,17 @@ static int run_listener(const char *iface, const char *port)
 		} else if (count == 0) {
 			continue;
 
-		} else if (strncmp(buffer, "ping", 4) != 0) {
-			warning("Invalid buffer received: %s", buffer);
+		} else if (data.type != PING) {
+			warning("Invalid data received");
 			continue;
 
 		} else {
-			notice("Got  ping");
+			notice("Got  ping (%u)", ntohs(data.id));
 		}
 
-		if ((count = send_to(sockfd, "pong", 4,
+		data.type = PONG;
+
+		if ((count = send_to(sockfd, &data, sizeof(struct pp_data),
 		                     (struct sockaddr *)&addr, len)) < 0) {
 			warning("Failed to send response");
 
@@ -72,7 +88,7 @@ static int run_listener(const char *iface, const char *port)
 			warning("Nothing sent");
 
 		} else {
-			notice("Sent pong");
+			notice("Sent pong (%u)", ntohs(data.id));
 		}
 	}
 
@@ -83,10 +99,11 @@ static int run_listener(const char *iface, const char *port)
 static int run_talker(const char *host, const char *port)
 {
 	struct sockaddr_storage addr;
-	char buffer[5] = { [4] = '\0' };
+	struct pp_data data;
 	socklen_t len;
 	ssize_t count;
 	int sockfd;
+	uint16_t id;
 
 	if ((sockfd = get_talker(host, port,
 	                         (struct sockaddr *)&addr, &len)) < 0) {
@@ -95,12 +112,16 @@ static int run_talker(const char *host, const char *port)
 	}
 
 	while (global.running == 1) {
+		id = rand();
+		data.type = PING;
+		data.id = htons(id);
+
 		sleep(PING_DELAY);
 
 		if (global.running == 0) {
 			break;
 
-		} else if ((count = send_to(sockfd, "ping", 4,
+		} else if ((count = send_to(sockfd, &data, sizeof(struct pp_data),
 		                            (struct sockaddr *)&addr, len)) < 0) {
 			warning("Failed to send request");
 			continue;
@@ -110,20 +131,26 @@ static int run_talker(const char *host, const char *port)
 			continue;
 
 		} else {
-			notice("Sent ping");
+			notice("Sent ping (%u)", ntohs(data.id));
 		}
 
-		if ((count = recv_from(sockfd, buffer, 4, NULL, NULL)) < 0) {
+		memset(&data, 0, sizeof(struct pp_data));
+
+		if ((count = recv_from(sockfd, &data, sizeof(struct pp_data),
+		                       NULL, NULL)) < 0) {
 			warning("Failed to receive response");
 
 		} else if (count == 0) {
 			continue;
 
-		} else if (strncmp(buffer, "pong", 4) != 0) {
-			warning("Invalid buffer received: %s", buffer);
+		} else if (data.type != PONG) {
+			warning("Invalid data received");
+
+		} else if (ntohs(data.id) != id) {
+			warning("Invalid id received (%u)", ntohs(data.id));
 
 		} else {
-			notice("Got  pong");
+			notice("Got  pong (%u)", ntohs(data.id));
 		}
 
 	}
@@ -239,6 +266,8 @@ int main(int argc, char **argv)
 		ecritical("Failed to handle SIGTERM");
 		exit(EXIT_FAILURE);
 	}
+
+	srand(time(NULL));
 
 	if (talker == 0) {
 		if (run_listener(iface ? iface : DEFAULT_IFACE,
