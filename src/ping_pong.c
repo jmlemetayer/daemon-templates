@@ -18,17 +18,38 @@ static struct {
 	.running = 1,
 };
 
+static void usage(void)
+{
+	fprintf(stderr,
+	        "Usage: " BIN_NAME " [OPTIONS]...\n"
+	        "The network ping pong tool.\n"
+	        "\nListener mode:\n"
+	        " -i, --interface IFACE   Use the specified interface"
+	        " (default is " DEFAULT_IFACE ").\n"
+	        "\nTalker mode:\n"
+	        " -h, --host HOST         Use the specified host.\n"
+	        "\nCommon options:\n"
+	        " -p, --port PORT         Use the specified port"
+	        " (default is " DEFAULT_PORT ").\n"
+	        " -f, --foreground        Do not daemonize.\n"
+	        "     --version           Display version.\n"
+	        "     --help              Display this help screen.\n"
+	        "\n" BIN_NAME " is part of the " PACKAGE_NAME " package.\n"
+	        "Report bugs to <" PACKAGE_BUGREPORT ">.\n"
+	        PACKAGE_NAME " home page: <" PACKAGE_URL ">.\n");
+}
+
 static void handler(int signal)
 {
 	switch (signal) {
 	case SIGHUP:
-		info("Daemon is alive");
+		info(BIN_NAME " is alive");
 		break;
 
 	case SIGINT:
 	case SIGQUIT:
 	case SIGTERM:
-		info("Stopping daemon");
+		info("Stopping " BIN_NAME);
 
 		global.running = 0;
 		break;
@@ -217,30 +238,20 @@ int main(int argc, char **argv)
 
 		case 0:
 			if (iopt == 0) {
-				fprintf(stdout, "daemon %s\n", VERSION);
+				fprintf(stdout, "%s %s\n",
+				        BIN_NAME, PACKAGE_VERSION);
 				exit(EXIT_SUCCESS);
 			}
 
 		default:
-			fprintf(stderr, "Usage: daemon [OPTIONS]...\n"
-			        "\nListener mode:\n"
-			        " -i, --interface IFACE   Use the specified interface"
-			        " (default is " DEFAULT_IFACE ").\n"
-			        "\nTalker mode:\n"
-			        " -h, --host HOST         Use the specified host.\n"
-			        "\nCommon options:\n"
-			        " -p, --port PORT         Use the specified port"
-			        " (default is " DEFAULT_PORT ").\n"
-			        " -f, --foreground        Do not daemonize.\n"
-			        "     --version           Display version.\n"
-			        "     --help              Display this help screen.\n");
+			usage();
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	openlog("daemon", logopt, LOG_DAEMON);
+	openlog(BIN_NAME, logopt, LOG_DAEMON);
 
-	info("Starting daemon in %s mode", talker ? "talker" : "listener");
+	info("Starting " BIN_NAME " in %s mode", talker ? "talker" : "listener");
 
 	if (foreground == 0 && daemon(0, 0) < 0) {
 		ecritical("Failed to daemonize");

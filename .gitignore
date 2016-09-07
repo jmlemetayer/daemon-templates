@@ -2,8 +2,27 @@
 .*
 *.o
 
-# Project files
-daemon
-
 # Git files that we don't want to ignore even it they are dot-files
 !/.gitignore
+
+# Autoscan
+/autoscan.log
+/configure.scan
+
+# Autoreconf
+Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/build-aux/
+/config.h*
+/configure
+
+# Configure
+Makefile
+/config.log
+/config.status
+/stamp-h1
+
+# Project files
+/net-tools-*
+/src/netpp
