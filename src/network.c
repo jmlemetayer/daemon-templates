@@ -78,14 +78,20 @@ int get_listener(const char *iface, const char *port)
 	}
 
 	for (info = infos; info != NULL; info = info->ifa_next) {
-		if (info->ifa_addr == NULL) {
+		if (strcmp(iface, info->ifa_name) != 0) {
+			continue;
+
+		} else if (info->ifa_addr == NULL) {
 			continue;
 
 		} else if (info->ifa_addr->sa_family == AF_INET) {
 			len = sizeof(struct sockaddr_in);
 
-		} else {
+		} else if (info->ifa_addr->sa_family == AF_INET6) {
 			len = sizeof(struct sockaddr_in6);
+
+		} else {
+			continue;
 		}
 
 		if ((err = getnameinfo(info->ifa_addr, len, host, NI_MAXHOST,
@@ -94,16 +100,14 @@ int get_listener(const char *iface, const char *port)
 			      "info: %s", gai_strerror(err));
 			continue;
 
-		} else if (strcmp(iface, info->ifa_name) == 0) {
-			if ((sockfd = get_listener_addr(host, port)) < 0) {
-				notice("Failed to get listener from "
-				       "host address %s", host);
-				continue;
-			}
-
-			freeifaddrs(infos);
-			return sockfd;
+		} else if ((sockfd = get_listener_addr(host, port)) < 0) {
+			notice("Failed to get listener from "
+			       "host address %s", host);
+			continue;
 		}
+
+		freeifaddrs(infos);
+		return sockfd;
 	}
 
 	freeifaddrs(infos);
