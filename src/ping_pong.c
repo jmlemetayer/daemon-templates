@@ -31,7 +31,7 @@ static void usage(void)
 	        "\nCommon options:\n"
 	        " -p, --port PORT         Use the specified port"
 	        " (default is " DEFAULT_PORT ").\n"
-	        " -f, --foreground        Do not daemonize.\n"
+	        " -b, --background        Daemonize.\n"
 	        "     --version           Display version.\n"
 	        "     --help              Display this help screen.\n"
 	        "\n" BIN_NAME " is part of the " PACKAGE_NAME " package.\n"
@@ -182,9 +182,9 @@ static int run_talker(const char *host, const char *port)
 
 int main(int argc, char **argv)
 {
+	int logopt = LOG_PID | LOG_PERROR;
 	int status = EXIT_SUCCESS;
-	int logopt = LOG_PID;
-	int foreground = 0;
+	int background = 0;
 	int iopt;
 	int opt;
 
@@ -199,11 +199,11 @@ int main(int argc, char **argv)
 		{"interface",	required_argument,	NULL, 'i'},
 		{"host",	required_argument,	NULL, 'h'},
 		{"port",	required_argument,	NULL, 'p'},
-		{"foreground",	no_argument,		NULL, 'f'},
+		{"background",	no_argument,		NULL, 'b'},
 		{NULL,		0,			NULL,  0 },
 	};
 
-	while ((opt = getopt_long(argc, argv, "i:h:p:f", lopt, &iopt)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "i:h:p:b", lopt, &iopt)) != EOF) {
 		switch (opt) {
 		case 'i':
 			if (iface == NULL && (iface = strdup(optarg)) == NULL) {
@@ -237,9 +237,9 @@ int main(int argc, char **argv)
 
 			break;
 
-		case 'f':
-			logopt |= LOG_PERROR;
-			foreground = 1;
+		case 'b':
+			logopt &= ~LOG_PERROR;
+			background = 1;
 			break;
 
 		case 0:
@@ -259,7 +259,7 @@ int main(int argc, char **argv)
 
 	info("Starting " BIN_NAME " in %s mode", talker ? "talker" : "listener");
 
-	if (foreground == 0 && daemon(0, 0) < 0) {
+	if (background != 0 && daemon(0, 0) < 0) {
 		ecritical("Failed to daemonize");
 		exit(EXIT_FAILURE);
 
