@@ -207,7 +207,9 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'i':
 			if (iface == NULL && (iface = strdup(optarg)) == NULL) {
-				ewarning("Failed to allocate iface");
+				fprintf(stderr,
+				        "W/ Failed to allocate iface: %s",
+				        strerror(errno));
 			}
 
 			break;
@@ -215,7 +217,9 @@ int main(int argc, char **argv)
 		case 'h':
 			if (host == NULL) {
 				if ((host = strdup(optarg)) == NULL) {
-					ewarning("Failed to allocate host");
+					fprintf(stderr,
+					        "W/ Failed to allocate host: %s",
+					        strerror(errno));
 
 				} else {
 					talker = 1;
@@ -226,7 +230,9 @@ int main(int argc, char **argv)
 
 		case 'p':
 			if (port == NULL && (port = strdup(optarg)) == NULL) {
-				ewarning("Failed to allocate port");
+				fprintf(stderr,
+				        "W/ Failed to allocate port: %s",
+				        strerror(errno));
 			}
 
 			break;
