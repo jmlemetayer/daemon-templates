@@ -121,10 +121,10 @@ static int run_talker(const char *host, const char *port)
 {
 	struct sockaddr_storage sa;
 	socklen_t salen = sizeof(sa);
+	uint16_t id = rand();
 	struct pp_data data;
 	ssize_t count;
 	int sockfd;
-	uint16_t id;
 
 	if ((sockfd = get_talker(host, port,
 	                         (struct sockaddr *)&sa, &salen)) < 0) {
@@ -133,7 +133,7 @@ static int run_talker(const char *host, const char *port)
 	}
 
 	while (global.running == 1) {
-		id = rand();
+		id += 1;
 		data.type = PING;
 		data.id = htons(id);
 
