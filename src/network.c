@@ -54,7 +54,8 @@ static int get_listener_addr(const char *addr, const char *port)
 	}
 
 	freeaddrinfo(infos);
-	error("Failed to get socket");
+	error("Failed to get listener socket for address: "
+	      "%s:%s", addr ? addr : "*", port);
 	return -1;
 }
 
@@ -63,7 +64,7 @@ int get_listener(const char *iface, const char *port)
 	struct ifaddrs *infos;
 	struct ifaddrs *info;
 	char host[NI_MAXHOST];
-	socklen_t len;
+	socklen_t salen;
 	int sockfd;
 	int err;
 
@@ -85,23 +86,24 @@ int get_listener(const char *iface, const char *port)
 			continue;
 
 		} else if (info->ifa_addr->sa_family == AF_INET) {
-			len = sizeof(struct sockaddr_in);
+			salen = sizeof(struct sockaddr_in);
 
 		} else if (info->ifa_addr->sa_family == AF_INET6) {
-			len = sizeof(struct sockaddr_in6);
+			salen = sizeof(struct sockaddr_in6);
 
 		} else {
 			continue;
 		}
 
-		if ((err = getnameinfo(info->ifa_addr, len, host, NI_MAXHOST,
+		if ((err = getnameinfo(info->ifa_addr, salen,
+		                       host, sizeof(host),
 		                       NULL, 0, NI_NUMERICHOST)) < 0) {
 			error("Failed to get interface name "
 			      "info: %s", gai_strerror(err));
 			continue;
 
 		} else if ((sockfd = get_listener_addr(host, port)) < 0) {
-			notice("Failed to get listener from "
+			notice("Failed to get listener socket from "
 			       "host address %s", host);
 			continue;
 		}
@@ -111,12 +113,12 @@ int get_listener(const char *iface, const char *port)
 	}
 
 	freeifaddrs(infos);
-	error("Failed to get interface address");
+	error("Failed to get listener socket on: %s:%s", iface, port);
 	return -1;
 }
 
 int get_talker(const char *host, const char *port,
-               struct sockaddr *addr, socklen_t *len)
+               struct sockaddr *sa, socklen_t *salen)
 {
 	struct addrinfo *infos;
 	struct addrinfo *info;
@@ -141,10 +143,12 @@ int get_talker(const char *host, const char *port,
 		                     info->ai_protocol)) < 0) {
 			eerror("Failed to create socket");
 			continue;
+
+		} else if (*salen > info->ai_addrlen) {
+			*salen = info->ai_addrlen;
 		}
 
-		memcpy(addr, info->ai_addr, sizeof(struct sockaddr));
-		*len = info->ai_addrlen;
+		memcpy(sa, info->ai_addr, *salen);
 
 		freeaddrinfo(infos);
 		info("Talking to %s:%s", host, port);
@@ -152,7 +156,7 @@ int get_talker(const char *host, const char *port,
 	}
 
 	freeaddrinfo(infos);
-	error("Failed to get socket");
+	error("Failed to get talker socket on: %s:%s", host, port);
 	return -1;
 }
 
@@ -183,19 +187,20 @@ static int wait_data(int sockfd, ssize_t timeout)
 	}
 }
 
-ssize_t recv_from(int sockfd, void *buf, size_t count,
-                  struct sockaddr *addr, socklen_t *len)
+ssize_t recv_from(int sockfd, void *buf, size_t len,
+                  struct sockaddr *sa, socklen_t *salen)
 {
 	ssize_t recv;
+	int ret;
 
-	if ((recv = wait_data(sockfd, DATA_TIMEOUT_SEC)) < 0) {
+	if ((ret = wait_data(sockfd, DATA_TIMEOUT_SEC)) < 0) {
 		error("Failed to wait for data");
 		return -1;
 
-	} else if (recv == 0) {
+	} else if (ret == 0) {
 		return 0;
 
-	} else if ((recv = recvfrom(sockfd, buf, count, 0, addr, len)) < 0) {
+	} else if ((recv = recvfrom(sockfd, buf, len, 0, sa, salen)) < 0) {
 		eerror("Failed to receive data");
 		return -1;
 	}
@@ -205,14 +210,14 @@ ssize_t recv_from(int sockfd, void *buf, size_t count,
 	return recv;
 }
 
-ssize_t send_to(int sockfd, const void *buf, size_t count,
-                const struct sockaddr *addr, socklen_t len)
+ssize_t send_to(int sockfd, const void *buf, size_t len,
+                const struct sockaddr *sa, socklen_t salen)
 {
 	ssize_t send;
 
-	dump("send", buf, count);
+	dump("send", buf, len);
 
-	if ((send = sendto(sockfd, buf, count, 0, addr, len)) < 0) {
+	if ((send = sendto(sockfd, buf, len, 0, sa, salen)) < 0) {
 		eerror("Failed to send data");
 		return -1;
 	}

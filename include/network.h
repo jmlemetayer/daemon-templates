@@ -11,11 +11,11 @@
 
 int get_listener(const char *iface, const char *port);
 int get_talker(const char *host, const char *port,
-               struct sockaddr *addr, socklen_t *len);
+               struct sockaddr *sa, socklen_t *salen);
 
-ssize_t recv_from(int sockfd, void *buf, size_t count,
-                  struct sockaddr *addr, socklen_t *len);
-ssize_t send_to(int sockfd, const void *buf, size_t count,
-                const struct sockaddr *addr, socklen_t len);
+ssize_t recv_from(int sockfd, void *buf, size_t len,
+                  struct sockaddr *sa, socklen_t *salen);
+ssize_t send_to(int sockfd, const void *buf, size_t len,
+                const struct sockaddr *sa, socklen_t salen);
 
 #endif

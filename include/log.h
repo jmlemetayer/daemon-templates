@@ -7,10 +7,10 @@
 
 #ifdef DEBUG
 #define debug(format, ...)	syslog(LOG_DEBUG, "D/ " format, ##__VA_ARGS__)
-void dump(const char *prefix, const void *buf, size_t count);
+void dump(const char *prefix, const void *buf, size_t len);
 #else
 #define debug(format, ...)
-#define dump(prefix, buf, count);
+#define dump(prefix, buf, len);
 #endif
 
 #define info(format, ...)	syslog(LOG_INFO, "I/ " format, ##__VA_ARGS__)

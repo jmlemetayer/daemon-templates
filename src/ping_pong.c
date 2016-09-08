@@ -68,9 +68,9 @@ struct pp_data {
 
 static int run_listener(const char *iface, const char *port)
 {
-	struct sockaddr_storage addr;
+	struct sockaddr_storage sa;
 	struct pp_data data;
-	socklen_t len;
+	socklen_t salen;
 	ssize_t count;
 	int sockfd;
 
@@ -80,11 +80,11 @@ static int run_listener(const char *iface, const char *port)
 	}
 
 	while (global.running == 1) {
-		memset(&data, 0, sizeof(struct pp_data));
-		len = sizeof(struct sockaddr_storage);
+		memset(&data, 0, sizeof(data));
+		salen = sizeof(sa);
 
-		if ((count = recv_from(sockfd, &data, sizeof(struct pp_data),
-		                       (struct sockaddr *)&addr, &len)) < 0) {
+		if ((count = recv_from(sockfd, &data, sizeof(data),
+		                       (struct sockaddr *)&sa, &salen)) < 0) {
 			warning("Failed to receive request");
 			continue;
 
@@ -101,8 +101,8 @@ static int run_listener(const char *iface, const char *port)
 
 		data.type = PONG;
 
-		if ((count = send_to(sockfd, &data, sizeof(struct pp_data),
-		                     (struct sockaddr *)&addr, len)) < 0) {
+		if ((count = send_to(sockfd, &data, sizeof(data),
+		                     (struct sockaddr *)&sa, salen)) < 0) {
 			warning("Failed to send response");
 
 		} else if (count == 0) {
@@ -119,15 +119,15 @@ static int run_listener(const char *iface, const char *port)
 
 static int run_talker(const char *host, const char *port)
 {
-	struct sockaddr_storage addr;
+	struct sockaddr_storage sa;
+	socklen_t salen = sizeof(sa);
 	struct pp_data data;
-	socklen_t len;
 	ssize_t count;
 	int sockfd;
 	uint16_t id;
 
 	if ((sockfd = get_talker(host, port,
-	                         (struct sockaddr *)&addr, &len)) < 0) {
+	                         (struct sockaddr *)&sa, &salen)) < 0) {
 		error("Failed to get talker socket");
 		return -1;
 	}
@@ -142,8 +142,8 @@ static int run_talker(const char *host, const char *port)
 		if (global.running == 0) {
 			break;
 
-		} else if ((count = send_to(sockfd, &data, sizeof(struct pp_data),
-		                            (struct sockaddr *)&addr, len)) < 0) {
+		} else if ((count = send_to(sockfd, &data, sizeof(data),
+		                            (struct sockaddr *)&sa, salen)) < 0) {
 			warning("Failed to send request");
 			continue;
 
@@ -155,9 +155,9 @@ static int run_talker(const char *host, const char *port)
 			notice("Sent ping (%u)", ntohs(data.id));
 		}
 
-		memset(&data, 0, sizeof(struct pp_data));
+		memset(&data, 0, sizeof(data));
 
-		if ((count = recv_from(sockfd, &data, sizeof(struct pp_data),
+		if ((count = recv_from(sockfd, &data, sizeof(data),
 		                       NULL, NULL)) < 0) {
 			warning("Failed to receive response");
 
