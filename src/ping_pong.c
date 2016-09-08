@@ -56,13 +56,11 @@ static void handler(int signal)
 	}
 }
 
-enum pp_type {
-	PING = 1,
-	PONG = 2,
-};
+#define PING 1
+#define PONG 2
 
-struct pp_data {
-	enum pp_type type;
+struct __attribute__((packed)) pp_data {
+	uint8_t type;
 	uint16_t id;
 };
 
