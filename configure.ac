@@ -22,8 +22,8 @@ AC_CHECK_HEADERS([arpa/inet.h \
 		  netdb.h \
 		  signal.h \
 		  syslog.h \
+		  sys/select.h \
 		  sys/socket.h \
-		  sys/times.h \
 		  time.h], [], AC_MSG_ERROR([header not found]))
 
 # Checks for typedefs, structures, and compiler characteristics.
