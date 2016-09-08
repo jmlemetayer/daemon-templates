@@ -9,8 +9,8 @@
 #define DEFAULT_IFACE   WILDCARD_IFACE
 #define DEFAULT_PORT    "1248"
 
-int get_listener(const char *iface, const char *port);
-int get_talker(const char *host, const char *port,
+int get_listener(const char *iface, const char *port, int family);
+int get_talker(const char *host, const char *port, int family,
                struct sockaddr *sa, socklen_t *salen);
 
 ssize_t recv_from(int sockfd, void *buf, size_t len,

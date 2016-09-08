@@ -24,17 +24,18 @@
 	} \
 }
 
-static int get_listener_addr(const char *addr, const char *port)
+static int get_listener_addr(const char *addr, const char *port, int family)
 {
 	struct addrinfo *infos;
 	struct addrinfo *info;
 	struct addrinfo hints;
+	int one = 1;
 	int sockfd;
 	int err;
 
 	memset(&hints, 0, sizeof(hints));
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = (family == AF_UNSPEC) ? AF_INET6 : family;
 	hints.ai_socktype = SOCK_DGRAM;
 
 	if (addr == NULL) {
@@ -50,6 +51,13 @@ static int get_listener_addr(const char *addr, const char *port)
 		if ((sockfd = socket(info->ai_family, info->ai_socktype,
 		                     info->ai_protocol)) < 0) {
 			eerror("Failed to create socket");
+			continue;
+
+		} else if (family == AF_INET6 &&
+		           setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY,
+		                      &one, sizeof(one)) < 0) {
+			eerror("Failed to set socket IPV6_V6ONLY option");
+			close(sockfd);
 			continue;
 
 		} else if (bind(sockfd, info->ai_addr, info->ai_addrlen) < 0) {
@@ -69,7 +77,7 @@ static int get_listener_addr(const char *addr, const char *port)
 	return -1;
 }
 
-int get_listener(const char *iface, const char *port)
+int get_listener(const char *iface, const char *port, int family)
 {
 	struct ifaddrs *infos;
 	struct ifaddrs *info;
@@ -81,7 +89,7 @@ int get_listener(const char *iface, const char *port)
 	debug("Requesting listener socket on %s:%s", iface, port);
 
 	if (strcmp(iface, WILDCARD_IFACE) == 0) {
-		return get_listener_addr(NULL, port);
+		return get_listener_addr(NULL, port, family);
 
 	} else if (getifaddrs(&infos) < 0) {
 		eerror("Failed to get interface info");
@@ -93,6 +101,10 @@ int get_listener(const char *iface, const char *port)
 			continue;
 
 		} else if (info->ifa_addr == NULL) {
+			continue;
+
+		} else if (family != AF_UNSPEC &&
+		           info->ifa_addr->sa_family != family) {
 			continue;
 
 		} else if (info->ifa_addr->sa_family == AF_INET) {
@@ -112,7 +124,8 @@ int get_listener(const char *iface, const char *port)
 			      "info: %s", gai_strerror(err));
 			continue;
 
-		} else if ((sockfd = get_listener_addr(host, port)) < 0) {
+		} else if ((sockfd = get_listener_addr(host, port,
+		                                       family)) < 0) {
 			notice("Failed to get listener socket from "
 			       "host address %s", host);
 			continue;
@@ -127,12 +140,13 @@ int get_listener(const char *iface, const char *port)
 	return -1;
 }
 
-int get_talker(const char *host, const char *port,
+int get_talker(const char *host, const char *port, int family,
                struct sockaddr *sa, socklen_t *salen)
 {
 	struct addrinfo *infos;
 	struct addrinfo *info;
 	struct addrinfo hints;
+	int one = 1;
 	int sockfd;
 	int err;
 
@@ -140,7 +154,7 @@ int get_talker(const char *host, const char *port,
 
 	memset(&hints, 0, sizeof(hints));
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = (family == AF_UNSPEC) ? AF_INET : family;
 	hints.ai_socktype = SOCK_DGRAM;
 
 	if ((err = getaddrinfo(host, port, &hints, &infos)) != 0) {
@@ -152,6 +166,13 @@ int get_talker(const char *host, const char *port,
 		if ((sockfd = socket(info->ai_family, info->ai_socktype,
 		                     info->ai_protocol)) < 0) {
 			eerror("Failed to create socket");
+			continue;
+
+		} else if (family == AF_INET6 &&
+		           setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY,
+		                      &one, sizeof(one)) < 0) {
+			eerror("Failed to set socket IPV6_V6ONLY option");
+			close(sockfd);
 			continue;
 
 		} else if (*salen > info->ai_addrlen) {

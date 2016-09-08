@@ -32,6 +32,8 @@ static void usage(void)
 	        "\nCommon options:\n"
 	        " -p, --port PORT         Use the specified port"
 	        " (default is " DEFAULT_PORT ").\n"
+	        " -4, --ipv4              Use IPv4 only.\n"
+	        " -6, --ipv6              Use IPv6 only.\n"
 	        " -b, --background        Daemonize.\n"
 	        "     --version           Display version.\n"
 	        "     --help              Display this help screen.\n"
@@ -66,7 +68,7 @@ struct __attribute__((packed)) pp_data {
 	struct timeval time;
 };
 
-static int run_listener(const char *iface, const char *port)
+static int run_listener(const char *iface, const char *port, int family)
 {
 	struct sockaddr_storage sa;
 	struct pp_data data;
@@ -74,7 +76,7 @@ static int run_listener(const char *iface, const char *port)
 	ssize_t count;
 	int sockfd;
 
-	if ((sockfd = get_listener(iface, port)) < 0) {
+	if ((sockfd = get_listener(iface, port, family)) < 0) {
 		error("Failed to get listener socket");
 		return -1;
 	}
@@ -124,7 +126,7 @@ static double diff_ms(struct timeval *time)
 	        ((double)cur.tv_usec - (double)time->tv_usec)) / 1000.0;
 }
 
-static int run_talker(const char *host, const char *port)
+static int run_talker(const char *host, const char *port, int family)
 {
 	struct sockaddr_storage sa;
 	socklen_t salen = sizeof(sa);
@@ -133,7 +135,7 @@ static int run_talker(const char *host, const char *port)
 	ssize_t count;
 	int sockfd;
 
-	if ((sockfd = get_talker(host, port,
+	if ((sockfd = get_talker(host, port, family,
 	                         (struct sockaddr *)&sa, &salen)) < 0) {
 		error("Failed to get talker socket");
 		return -1;
@@ -193,6 +195,7 @@ int main(int argc, char **argv)
 {
 	int logopt = LOG_PID | LOG_PERROR;
 	int status = EXIT_SUCCESS;
+	int family = AF_UNSPEC;
 	int background = 0;
 	int iopt;
 	int opt;
@@ -209,10 +212,12 @@ int main(int argc, char **argv)
 		{"host",	required_argument,	NULL, 'h'},
 		{"port",	required_argument,	NULL, 'p'},
 		{"background",	no_argument,		NULL, 'b'},
+		{"ipv4",	no_argument,		NULL, '4'},
+		{"ipv6",	no_argument,		NULL, '6'},
 		{NULL,		0,			NULL,  0 },
 	};
 
-	while ((opt = getopt_long(argc, argv, "i:h:p:b", lopt, &iopt)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "i:h:p:b46", lopt, &iopt)) != EOF) {
 		switch (opt) {
 		case 'i':
 			if (iface == NULL && (iface = strdup(optarg)) == NULL) {
@@ -249,6 +254,20 @@ int main(int argc, char **argv)
 		case 'b':
 			logopt &= ~LOG_PERROR;
 			background = 1;
+			break;
+
+		case '4':
+			if (family == AF_UNSPEC) {
+				family = AF_INET;
+			}
+
+			break;
+
+		case '6':
+			if (family == AF_UNSPEC) {
+				family = AF_INET6;
+			}
+
 			break;
 
 		case 0:
@@ -297,13 +316,14 @@ int main(int argc, char **argv)
 
 	if (talker == 0) {
 		if (run_listener(iface ? iface : DEFAULT_IFACE,
-		                 port ? port : DEFAULT_PORT) < 0) {
+		                 port ? port : DEFAULT_PORT,
+		                 family) < 0) {
 			critical("Failed to run listener");
 			status = EXIT_FAILURE;
 		}
 
 	} else {
-		if (run_talker(host, port ? port : DEFAULT_PORT) < 0) {
+		if (run_talker(host, port ? port : DEFAULT_PORT, family) < 0) {
 			critical("Failed to run talker");
 			status = EXIT_FAILURE;
 		}
