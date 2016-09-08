@@ -65,7 +65,11 @@ static void handler(int signal)
 struct __attribute__((packed)) pp_data {
 	uint8_t type;
 	uint16_t id;
-	struct timeval time;
+	union {
+		struct timeval start;
+		uint8_t pad[16];
+	} payload;
+#define start payload.start
 };
 
 static int run_listener(const char *iface, const char *port, int family)
@@ -147,7 +151,7 @@ static int run_talker(const char *host, const char *port, int family)
 		id += 1;
 		data.type = PING;
 		data.id = htons(id);
-		gettimeofday(&data.time, NULL);
+		gettimeofday(&data.start, NULL);
 
 		if (global.running == 0) {
 			break;
@@ -182,7 +186,7 @@ static int run_talker(const char *host, const char *port, int family)
 
 		} else {
 			notice("Sequence acknowledged in %.2f ms (%u)",
-			       diff_ms(&data.time), ntohs(data.id));
+			       diff_ms(&data.start), ntohs(data.id));
 		}
 
 	}
