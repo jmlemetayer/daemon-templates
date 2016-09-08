@@ -14,6 +14,16 @@
 
 #define DATA_TIMEOUT_SEC	2
 
+#define logsaddr(level, prefix, sa, salen) { \
+	char host[NI_MAXHOST]; \
+	char serv[NI_MAXSERV]; \
+	if (getnameinfo(sa, salen, \
+			host, sizeof(host), serv, sizeof(serv), \
+			NI_NUMERICHOST | NI_NUMERICSERV) == 0) { \
+		level(prefix " %s:%s", host, serv); \
+	} \
+}
+
 static int get_listener_addr(const char *addr, const char *port)
 {
 	struct addrinfo *infos;
@@ -49,7 +59,7 @@ static int get_listener_addr(const char *addr, const char *port)
 		}
 
 		freeaddrinfo(infos);
-		info("Listening on %s:%s", addr ? addr : "*", port);
+		logsaddr(info, "Listening on", info->ai_addr, info->ai_addrlen);
 		return sockfd;
 	}
 
@@ -151,7 +161,7 @@ int get_talker(const char *host, const char *port,
 		memcpy(sa, info->ai_addr, *salen);
 
 		freeaddrinfo(infos);
-		info("Talking to %s:%s", host, port);
+		logsaddr(info, "Talking to", info->ai_addr, info->ai_addrlen);
 		return sockfd;
 	}
 
@@ -193,6 +203,11 @@ ssize_t recv_from(int sockfd, void *buf, size_t len,
 	ssize_t recv;
 	int ret;
 
+	struct sockaddr_storage rsa;
+	socklen_t rsalen = sizeof(rsa);
+	struct sockaddr *psa = sa ? sa : (struct sockaddr *)&rsa;
+	socklen_t *psalen = salen ? salen : &rsalen;
+
 	if ((ret = wait_data(sockfd, DATA_TIMEOUT_SEC)) < 0) {
 		error("Failed to wait for data");
 		return -1;
@@ -200,11 +215,12 @@ ssize_t recv_from(int sockfd, void *buf, size_t len,
 	} else if (ret == 0) {
 		return 0;
 
-	} else if ((recv = recvfrom(sockfd, buf, len, 0, sa, salen)) < 0) {
+	} else if ((recv = recvfrom(sockfd, buf, len, 0, psa, psalen)) < 0) {
 		eerror("Failed to receive data");
 		return -1;
 	}
 
+	logsaddr(debug, "Received from", psa, *psalen);
 	dump("recv", buf, recv);
 
 	return recv;
@@ -215,6 +231,7 @@ ssize_t send_to(int sockfd, const void *buf, size_t len,
 {
 	ssize_t send;
 
+	logsaddr(debug, "Sending to   ", sa, salen);
 	dump("send", buf, len);
 
 	if ((send = sendto(sockfd, buf, len, 0, sa, salen)) < 0) {
