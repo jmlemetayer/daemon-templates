@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -62,6 +63,7 @@ static void handler(int signal)
 struct __attribute__((packed)) pp_data {
 	uint8_t type;
 	uint16_t id;
+	struct timeval time;
 };
 
 static int run_listener(const char *iface, const char *port)
@@ -92,9 +94,6 @@ static int run_listener(const char *iface, const char *port)
 		} else if (data.type != PING) {
 			warning("Invalid data received");
 			continue;
-
-		} else {
-			notice("Got  ping (%u)", ntohs(data.id));
 		}
 
 		data.type = PONG;
@@ -107,12 +106,22 @@ static int run_listener(const char *iface, const char *port)
 			warning("Nothing sent");
 
 		} else {
-			notice("Sent pong (%u)", ntohs(data.id));
+			notice("Sequence acknowledged (%u)", ntohs(data.id));
 		}
 	}
 
 	close(sockfd);
 	return 0;
+}
+
+static double diff_ms(struct timeval *time)
+{
+	struct timeval cur;
+
+	gettimeofday(&cur, NULL);
+
+	return ((((double)cur.tv_sec - (double)time->tv_sec) * 1000000.0) +
+	        ((double)cur.tv_usec - (double)time->tv_usec)) / 1000.0;
 }
 
 static int run_talker(const char *host, const char *port)
@@ -131,26 +140,27 @@ static int run_talker(const char *host, const char *port)
 	}
 
 	while (global.running == 1) {
+		sleep(PING_DELAY);
+
 		id += 1;
 		data.type = PING;
 		data.id = htons(id);
-
-		sleep(PING_DELAY);
+		gettimeofday(&data.time, NULL);
 
 		if (global.running == 0) {
 			break;
+		}
 
-		} else if ((count = send_to(sockfd, &data, sizeof(data),
-		                            (struct sockaddr *)&sa, salen)) < 0) {
+		notice("Sending ping pong sequence        (%u)", id);
+
+		if ((count = send_to(sockfd, &data, sizeof(data),
+		                     (struct sockaddr *)&sa, salen)) < 0) {
 			warning("Failed to send request");
 			continue;
 
 		} else if (count == 0) {
 			warning("Nothing sent");
 			continue;
-
-		} else {
-			notice("Sent ping (%u)", ntohs(data.id));
 		}
 
 		memset(&data, 0, sizeof(data));
@@ -169,7 +179,8 @@ static int run_talker(const char *host, const char *port)
 			warning("Invalid id received (%u)", ntohs(data.id));
 
 		} else {
-			notice("Got  pong (%u)", ntohs(data.id));
+			notice("Sequence acknowledged in %.2f ms (%u)",
+			       diff_ms(&data.time), ntohs(data.id));
 		}
 
 	}

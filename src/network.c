@@ -220,7 +220,7 @@ ssize_t recv_from(int sockfd, void *buf, size_t len,
 		return -1;
 	}
 
-	logsaddr(debug, "Received from", psa, *psalen);
+	logsaddr(debug, "  from:", psa, *psalen);
 	dump("recv", buf, recv);
 
 	return recv;
@@ -231,7 +231,7 @@ ssize_t send_to(int sockfd, const void *buf, size_t len,
 {
 	ssize_t send;
 
-	logsaddr(debug, "Sending to   ", sa, salen);
+	logsaddr(debug, "    to:", sa, salen);
 	dump("send", buf, len);
 
 	if ((send = sendto(sockfd, buf, len, 0, sa, salen)) < 0) {

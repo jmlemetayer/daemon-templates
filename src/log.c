@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define DUMPSIZE		16
+#define DUMPSIZE		32
 
 #ifdef DEBUG
 void dump(const char *prefix, const void *buf, size_t len)
