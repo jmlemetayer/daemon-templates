@@ -1,0 +1,12 @@
+language: c
+compiler:
+        - clang
+        - gcc
+env:
+        - OPTIONS=
+        - OPTIONS=--enable-debug
+script:
+        - ./bootstrap
+        - ./configure $OPTIONS
+        - make check
+        - make distcheck
