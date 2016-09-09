@@ -5,7 +5,7 @@ AC_INIT([net-tools],
 	[https://github.com/jmlemetayer/net-tools])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_SRCDIR([src/ping_pong.c])
-AM_INIT_AUTOMAKE([foreign -Wall -Werror])
+AM_INIT_AUTOMAKE([foreign subdir-objects -Wall -Werror])
 AC_LANG([C])
 
 # Checks for programs.
@@ -42,5 +42,5 @@ AS_IF([test "x$enable_debug" != xno],
       AM_SILENT_RULES([no])],
       [AM_SILENT_RULES([yes])])
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

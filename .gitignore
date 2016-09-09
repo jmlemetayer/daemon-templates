@@ -25,4 +25,4 @@ Makefile
 
 # Project files
 /net-tools-*
-/src/netpp
+/netpp
