@@ -23,6 +23,11 @@ Makefile
 /config.status
 /stamp-h1
 
+# Test suite
+/test-suite.log
+/tests/*.log
+/tests/*.trs
+
 # Project files
 /net-tools-*
 /netpp
