@@ -112,7 +112,7 @@ static int run_listener(const char *iface, const char *port, int family)
 			warning("Nothing sent");
 
 		} else {
-			notice("Sequence acknowledged (%u)", ntohs(data.id));
+			notice("Sequence acknowledged: %u", ntohs(data.id));
 		}
 	}
 
@@ -157,7 +157,7 @@ static int run_talker(const char *host, const char *port, int family)
 			break;
 		}
 
-		notice("Sending ping pong sequence        (%u)", id);
+		notice("Sending ping pong sequence: %u", id);
 
 		if ((count = send_to(sockfd, &data, sizeof(data),
 		                     (struct sockaddr *)&sa, salen)) < 0) {
@@ -182,10 +182,10 @@ static int run_talker(const char *host, const char *port, int family)
 			warning("Invalid data received");
 
 		} else if (ntohs(data.id) != id) {
-			warning("Invalid id received (%u)", ntohs(data.id));
+			warning("Invalid id received: %u", ntohs(data.id));
 
 		} else {
-			notice("Sequence acknowledged in %.2f ms (%u)",
+			notice("Sequence acknowledged in %.2f ms: %u",
 			       diff_ms(&data.start), ntohs(data.id));
 		}
 
